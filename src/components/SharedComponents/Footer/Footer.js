@@ -112,7 +112,6 @@ const Container = styled.footer`
 
   @media (max-width: 576px) {
     height: 110px;
-    margin-bottom: 58px;
    }
    
    @-webkit-keyframes slide-down {
@@ -310,18 +309,9 @@ export default function Footer({ path }) {
   const category = CATEGORY.default;
 
   const clickMenu = (menu) => {
-    if (menu.tag !== null) {
+    if (menu.tag === null || menu.planFlag === false || menu.title === null) {
+      alert("서비스 준비중 입니다.");
       sessionStorage.setItem("boardPageNum", 1);
-      sessionStorage.setItem("boardId", menu.tag);
-    } else {
-      if (menu.planFlag === false && menu.title !== null) {
-        if (menu.link === '/market/sell')
-          sessionStorage.setItem("nowMarketId", 0);
-        else sessionStorage.setItem("nowMarketId", 1);
-        sessionStorage.setItem("nowMarketPageNum", 1);
-      } else {
-        alert("서비스 준비중 입니다.");
-      }
     }
   };
 
