@@ -4,3 +4,4 @@ a2
 bug fix
 hot-fix
 a5
+bugFix
