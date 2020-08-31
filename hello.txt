@@ -16,3 +16,4 @@ a10
 a11
 new feature add
 bugFix-newBug resolve
+hotFix-notimetable resolve
