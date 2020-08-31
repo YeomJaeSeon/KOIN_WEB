@@ -6,6 +6,10 @@ export const GET_MY_LECTURES = "GET_MY_LECTURES";
 export const GET_MY_LECTURES_SUCCESS = "GET_MY_LECTURES_SUCCESS";
 export const GET_MY_LECTURES_ERROR = "GET_MY_LECTURES_ERROR";
 
+export const GET_MY_INDEX_LECTURES = "GET_MY_INDEX_LECTURES";
+export const GET_MY_INDEX_LECTURES_SUCCESS = "GET_MY_INDEX_LECTURES_SUCCESS";
+export const GET_MY_INDEX_LECTURES_ERROR = "GET_MY_INDEX_LECTURES_ERROR";
+
 export const GET_ALL_SEMESTER = "GET_ALL_SEMESTER";
 export const GET_ALL_SEMESTER_SUCCESS = "GET_ALL_SEMESTER_SUCCESS";
 export const GET_ALL_SEMESTER_ERROR = "GET_ALL_SEMESTER_ERROR";
@@ -91,6 +95,61 @@ export const getMyLectures = payload => async (dispatch, getState) => {
   } catch (e) {
     dispatch({
       type: GET_MY_LECTURES_ERROR,
+      error: e.response
+    })
+  }
+}
+
+// 첫 페이지의 시간표를 만드는 함수, selectedSemester 필요
+export const getMyIndexLectures = (payload) => async (dispatch, getState) => {
+  const { token } = payload;
+  const { selectedSemester, colors } = getState().timetableReducer;
+  dispatch({ type: GET_MY_INDEX_LECTURES });
+  try {
+    const res = await infoAPI.getMyTimeTable(token, selectedSemester);
+    let lectures = Array.apply(null, {length: 5}).map(() => []),
+      timetable = res.data.timetable,
+      nowDay = -1,
+      tempClassStartTime,
+      tempClassEndTime
+    console.log(timetable)
+    timetable.forEach(({class_time, class_title}, index) => {
+      nowDay = -1
+      class_time.forEach(
+        time => {
+          if (nowDay === -1) {
+            nowDay = Math.floor(time / 100)
+            tempClassStartTime = time % 100
+          } else if (nowDay !== Math.floor(time / 100)) {
+            console.log(tempClassStartTime, tempClassEndTime)
+            if (nowDay !== 5 && nowDay !== 6)
+              lectures[nowDay].push({
+                name: class_title,
+                start: (tempClassStartTime >= 18 ? 288 : (tempClassStartTime * 16)) + 1,
+                end: tempClassEndTime >= 18 ? 342 : ((tempClassEndTime + 1) * 16),
+                backgroundColor: colors[index]
+              })
+            nowDay = Math.floor(time / 100)
+            tempClassStartTime = time % 100
+          } else {
+            tempClassEndTime = time % 100
+          }
+        }
+      )
+      console.log(tempClassStartTime, tempClassEndTime)
+      if (nowDay !== 5 && nowDay !== 6)
+        lectures[nowDay].push({
+          name: class_title,
+          start: tempClassStartTime >= 18 ? 289 : ((tempClassStartTime) * 16),
+          end: tempClassEndTime >= 18 ? 342 : ((tempClassEndTime + 1) * 16),
+          backgroundColor: colors[index]
+        })
+    })
+
+    dispatch({ type: GET_MY_INDEX_LECTURES_SUCCESS, payload: lectures })
+  } catch (e) {
+    dispatch({
+      type: GET_MY_INDEX_LECTURES_ERROR,
       error: e.response
     })
   }
@@ -320,26 +379,24 @@ export const addLectureOnTable = payload => dispatch => {
       }
     }
   }
-  for (let j = 0; j < times.length; j++) {
-    let layoutStyle = {
-      'start': { x: parseInt(times[j][0] / 100) + 2, y: parseInt(times[j][0] % 100) },
-      'end': { x: parseInt(times[j][times[j].length - 1] / 100) + 2, y: parseInt(times[j][times[j].length - 1] % 100) },
-      'backgroundColor': color,
-      'borderBottomColor': color,
-      'id': lecture.id ? lecture.id : `${lecture.code + lecture.lecture_class}`,
-      'title': titleArr[j],
-      'info': `${classArr[j] || ""} ${profArr[j] || ""}`,
-      'code': lecture.code + lecture.lecture_class
+  let layoutStyle = times.map((value, j) => ({
+    'start': { x: parseInt(times[j][0] / 100) + 2, y: parseInt(times[j][0] % 100) },
+    'end': { x: parseInt(times[j][times[j].length - 1] / 100) + 2, y: parseInt(times[j][times[j].length - 1] % 100) },
+    'backgroundColor': color,
+    'borderBottomColor': color,
+    'id': lecture.id ? lecture.id : `${lecture.code + lecture.lecture_class}`,
+    'title': titleArr[j],
+    'info': `${classArr[j] || ""} ${profArr[j] || ""}`,
+    'code': lecture.code + lecture.lecture_class
+  }))
+
+  dispatch({
+    type: UPDATE_LAYOUT,
+    payload: {
+      layout: layoutStyle,
+      flag
     }
-    dispatch({
-      type: UPDATE_LAYOUT,
-      payload: {
-        layout: layoutStyle,
-        flag
-      }
-    })
-  }
-  
+  })
 }
 
 export const removeLecture = payload => async (dispatch, getState) => {
@@ -429,7 +486,12 @@ const initialState = {
 
   isOpen: false,
   isInfoSheet: false,
-  selectedMyLecture: null
+  selectedMyLecture: null,
+  indexLecture: {
+    loading: false,
+    error: false,
+    lectures: Array.apply(null, {length: 5}).map(() => [])
+  }
 }
 
 export default function timetableReducer(state = initialState, action) {
@@ -458,6 +520,33 @@ export default function timetableReducer(state = initialState, action) {
         ...state,
         isMyLectureLoading: false,
         error: action.error
+      }
+    case GET_MY_INDEX_LECTURES:
+      return {
+        ...state,
+        indexLecture: {
+          loading: true,
+          error: false,
+          lectures: Array.apply(null, {length: 5}).map(() => [])
+        }
+      }
+    case GET_MY_INDEX_LECTURES_SUCCESS:
+      return {
+        ...state,
+        indexLecture: {
+          loading: false,
+          error: false,
+          lectures: action.payload
+        }
+      }
+    case GET_MY_INDEX_LECTURES_ERROR:
+      return {
+        ...state,
+        indexLecture: {
+          ...state.indexLecture,
+          loading: false,
+          error: true
+        }
       }
     case GET_ALL_LECTURE:
       return {
@@ -533,7 +622,9 @@ export default function timetableReducer(state = initialState, action) {
         ...state,
         myLectures: state.myLectures.filter((lecture, index) => index !== action.payload.id),
         layout: action.payload.layout,
-        removedColors: state.removedColors.concat(action.payload.bgColor)
+        removedColors: action.payload.bgColor
+          ? state.removedColors.concat(action.payload.bgColor)
+          : state.removedColors
       }
     case REMOVE_LECTURE_ERROR:
       return {
